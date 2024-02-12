@@ -585,7 +585,7 @@ def load_process_spectra_parallel(
     read_spectra_list = [j[:6] for i in read_spectra_list for j in i]
     spectra_meta_df = pd.DataFrame(read_spectra_list,\
         columns=['bucket', 'precursor_charge', 'precursor_mz', 'identifier',
-        'scan', 'retention_time'])
+        'scan', 'retention_time', 'title'])
  
     # TODO: Add exception for scan missing
     for c in spectra_meta_df.columns:
@@ -600,6 +600,9 @@ def load_process_spectra_parallel(
 
         if c in ['retention_time', 'precursor_mz']:
             spectra_meta_df[c] = spectra_meta_df[c].astype(np.float32)
+
+        if c in ['title']:
+            spectra_meta_df[c] = spectra_meta_df[c].astype(str)
 
     # Filter invalid charge
     if len(config.cluster_charges):
@@ -644,7 +647,7 @@ def load_raw_spectra_parallel(
 
     read_spectra_list = pd.DataFrame(read_spectra_list,\
         columns=['bucket', 'precursor_charge', 'precursor_mz', 'identifier',
-        'scan', 'retention_time', 'mz', 'intensity'])
+        'scan', 'retention_time', 'mz', 'intensity', 'title'])
     
     # Add exception for scan missing
     for c in read_spectra_list.columns:
@@ -660,8 +663,9 @@ def load_raw_spectra_parallel(
         if c in ['retention_time', 'precursor_mz']:
             read_spectra_list[c] = read_spectra_list[c].astype(np.float32)
 
+        if c in ['title']:
+            read_spectra_list[c] = read_spectra_list[c].astype(str)    
+
     read_spectra_list = read_spectra_list.sort_values(by=['precursor_charge', 'bucket'], ascending=True)
     
     return read_spectra_list.reset_index(drop=True)
-
-
