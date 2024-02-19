@@ -96,7 +96,7 @@ cpdef list load_mgf_file(filename):
         Py_ssize_t peak_i = 0
 
     cdef:
-        # bytes title
+        bytes title
         spec_data_fmt rtinsecs, pepmass
         int charge, scans, spec_index
         spec_data_fmt mz_temp, intensity_temp
@@ -147,16 +147,16 @@ cpdef list load_mgf_file(filename):
             peak_i = 0
             charge = -1
             pepmass = -1
-            # title = None
+            title = None
             scans = -1 
             rtinsecs = -1
             mz.clear()
             intensity.clear()
             continue
-        # elif(is_title(line)):
-            # title = line[6:]
-            # printf("TITLE is: %s\n", title)
-            # continue
+        elif(is_title(line)):
+            title = line[6:20]
+            #printf("TITLE is: %s\n", title)
+            continue
         elif(is_scans(line)):
             scans = atoi(line[6:])
             # printf("SCANS is: %d\n", scans)
@@ -190,7 +190,7 @@ cpdef list load_mgf_file(filename):
                         -1, charge, pepmass, 
                         filename, scans, rtinsecs, 
                         vector_to_array(mz, peak_i),
-                        vector_to_array(intensity, peak_i)
+                        vector_to_array(intensity, peak_i), title
                         ])
 
                     spec_index +=1
