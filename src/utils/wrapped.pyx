@@ -154,7 +154,7 @@ cpdef list load_mgf_file(filename):
             intensity.clear()
             continue
         elif(is_title(line)):
-            title = line[6:]
+            title = line[6:20]
             #printf("TITLE is: %s\n", title)
             continue
         elif(is_scans(line)):
