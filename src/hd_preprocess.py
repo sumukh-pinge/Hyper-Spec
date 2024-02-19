@@ -582,7 +582,7 @@ def load_process_spectra_parallel(
     spectra_mz = np.array([j[6] for i in read_spectra_list for j in i], dtype=np.float32)
     spectra_intensity = np.array([j[7] for i in read_spectra_list for j in i], dtype=np.float32)
 
-    read_spectra_list = [j[:7] for i in read_spectra_list for j in i]
+    read_spectra_list =  [j[:6] + [j[7]] for i in read_spectra_list for j in i]
     spectra_meta_df = pd.DataFrame(read_spectra_list,\
         columns=['bucket', 'precursor_charge', 'precursor_mz', 'identifier',
         'scan', 'retention_time', 'title'])
