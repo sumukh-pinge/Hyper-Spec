@@ -1,7 +1,7 @@
 FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
 
 # Update and install mini-conda
-RUN apt-get update && apt-get install -y time wget g++ libboost-all-dev git && \
+RUN apt-get update && apt-get install -y time wget g++ libboost-all-dev git vim && \
         apt-get clean
 
 RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/anaconda.sh && \
@@ -26,10 +26,14 @@ ENV PATH /opt/conda/envs/hyper-spec/bin:$PATH
 ENV CONDA_DEFAULT_ENV $hyper-spec
 
 # Clone the code
-RUN git clone https://github.com/wh-xu/Hyper-Spec.git 
+RUN git clone https://github.com/sumukh-pinge/Hyper-Spec.git
 
 # set working dir
 WORKDIR /Hyper-Spec
 
 # Install and build  
 RUN bash ./install.sh 
+
+RUN /bin/bash -c "source /opt/conda/etc/profile.d/conda.sh && \
+    conda activate hyper-spec && \
+    conda install -c nvidia cuda-python=11.7.0 -y"
