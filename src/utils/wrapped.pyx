@@ -63,6 +63,11 @@ cdef inline bint is_title(char *buf):
     return strcmp(buf[0:5], 'TITLE')==0
 
 @cython.boundscheck(False)
+cdef inline bint is_specid(char *buf):
+    # return fast_str_compare(buf, 'SPECID', 6)==0
+    return strcmp(buf[0:6], 'SPECID')==0
+
+@cython.boundscheck(False)
 cdef inline bint is_scans(char *buf):
     # return fast_str_compare(buf, 'SCANS', 5)==0
     return strcmp(buf[0:5], 'SCANS')==0
@@ -96,7 +101,7 @@ cpdef list load_mgf_file(filename):
         Py_ssize_t peak_i = 0
 
     cdef:
-        bytes title
+        bytes title, specid
         spec_data_fmt rtinsecs, pepmass
         int charge, scans, spec_index
         spec_data_fmt mz_temp, intensity_temp
@@ -148,6 +153,7 @@ cpdef list load_mgf_file(filename):
             charge = -1
             pepmass = -1
             title = None
+            specid = None
             scans = -1 
             rtinsecs = -1
             mz.clear()
@@ -157,6 +163,10 @@ cpdef list load_mgf_file(filename):
             title = line[6:]
             #printf("TITLE is: %s\n", title)
             continue
+        elif(is_specid(line)):
+            specid = line[7:]
+            #printf("SPECID is: %s\n", specid)
+            continue            
         elif(is_scans(line)):
             scans = atoi(line[6:])
             # printf("SCANS is: %d\n", scans)
@@ -190,7 +200,7 @@ cpdef list load_mgf_file(filename):
                         -1, charge, pepmass, 
                         filename, scans, rtinsecs, 
                         vector_to_array(mz, peak_i),
-                        vector_to_array(intensity, peak_i), title
+                        vector_to_array(intensity, peak_i), title, specid
                         ])
 
                     spec_index +=1
