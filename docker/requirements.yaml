@@ -22,3 +22,4 @@ dependencies:
   - numba=0.55.1
   - tqdm=4.64.0
   - s3cmd=2.0.2
+  - cuda-python=11.7.0
