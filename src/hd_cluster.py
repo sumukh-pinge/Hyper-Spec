@@ -1,5 +1,6 @@
 import os, time, logging, math
 from tqdm import tqdm
+import math
 
 import numpy as np
 np.random.seed(0)
@@ -19,6 +20,7 @@ from scipy.spatial.distance import squareform
 from scipy.cluster.hierarchy import fcluster
 import fastcluster
 from sklearn.cluster import DBSCAN
+from sklearn.cluster import KMeans
 
 from config import Config
 from joblib import Parallel, delayed
@@ -653,6 +655,59 @@ def hcluster_bucket(
         return [cluster_labels_refined, representative_mask]
  
 
+def kmeans_and_hierarchical(
+    bucket_hv: np.ndarray,
+    bucket_prec_mz: np.ndarray,
+    precursor_tol: list,
+    k: int,
+    linkage: str,
+    eps: float,
+    output_type: str
+):
+    """
+    Perform K-means clustering followed by hierarchical clustering on each cluster.
+
+    Parameters:
+    - bucket_hv: The hypervectors for the current bucket.
+    - bucket_prec_mz: The precursor m/z values for the current bucket.
+    - precursor_tol: Tolerance for precursor m/z value.
+    - k: The number of K-means clusters.
+    - linkage: The linkage criterion for hierarchical clustering.
+    - eps: The maximum distance for flat clustering.
+    - output_type: Output format for distance matrix ('numpy' or 'cupy').
+
+    Returns:
+    - cluster_labels: Array of cluster labels for all elements in the bucket.
+    """
+    # Perform K-means clustering
+    kmeans = KMeans(n_clusters=k, n_init='auto')
+    kmeans_labels = kmeans.fit_predict(bucket_hv)
+    
+    # Initialize the array to store final cluster labels
+    final_labels = np.zeros(bucket_hv.shape[0], dtype=int)
+    max_label = 0
+
+    for label in range(k):
+        cluster_indices = np.where(kmeans_labels == label)[0]
+        cluster_data = bucket_hv[cluster_indices]
+        cluster_prec_mz = bucket_prec_mz[cluster_indices]
+
+        # Skip clusters with less than two elements
+        if cluster_data.shape[0] <= 1:
+            final_labels[cluster_indices] = -1
+            continue
+
+        # Perform hierarchical clustering on the current K-means cluster
+        pw_dist = fast_nb_cosine_dist_condense(cluster_data, cluster_prec_mz, precursor_tol[0], output_type)
+        lk = fastcluster.linkage(pw_dist, linkage)
+        L = fcluster(lk, eps, 'distance')
+
+        # Adjust labels to be unique across clusters
+        final_labels[cluster_indices] = L + max_label
+        max_label += max(L)
+    
+    return final_labels
+
 def hcluster_par_bucket(
     bucket_slice: tuple, 
     bucket_hv: np.ndarray,
@@ -664,28 +719,62 @@ def hcluster_par_bucket(
     rt_tol: float,
     output_type: str='numpy'
 ):
-    if bucket_slice[1]-bucket_slice[0]==0:
+    bucket_size = bucket_slice[1] - bucket_slice[0] + 1
+    k = max(1, math.ceil(bucket_size / 300))
+    
+    if bucket_size <= 0:
         return [np.array([-1]), np.array([True], dtype=np.bool)]
     else:
+        # Perform K-means and hierarchical clustering
+        cluster_labels_refined = kmeans_and_hierarchical(
+            bucket_hv, bucket_prec_mz, precursor_tol, k, linkage, eps, output_type)
+
         pw_dist = fast_nb_cosine_dist_condense(bucket_hv, bucket_prec_mz, precursor_tol[0], output_type)
-
-        lk = fastcluster.linkage(pw_dist, linkage)
-
-        L = fcluster(lk, eps, 'distance') - 1
-
-        cluster_labels_refined = refine_cluster(
-            bucket_cluster_label = L, 
-            bucket_precursor_mzs = bucket_prec_mz,
-            bucket_rts = bucket_rt_time,
-            precursor_tol_mass = precursor_tol[0], 
-            precursor_tol_mode = precursor_tol[1], 
-            rt_tol = rt_tol)
-                
         pw_dist = squareform(pw_dist).astype(np.float32)
         representative_mask = get_cluster_representative(
             cluster_labels=cluster_labels_refined, pw_dist=pw_dist)
         
         return [cluster_labels_refined, representative_mask]
+
+
+
+
+
+
+
+# def hcluster_par_bucket(
+#     bucket_slice: tuple, 
+#     bucket_hv: np.ndarray,
+#     bucket_prec_mz: np.ndarray,
+#     bucket_rt_time: np.ndarray,
+#     linkage: str,
+#     precursor_tol: list,
+#     eps: float,
+#     rt_tol: float,
+#     output_type: str='numpy'
+# ):
+#     if bucket_slice[1]-bucket_slice[0]==0:
+#         return [np.array([-1]), np.array([True], dtype=np.bool)]
+#     else:
+#         pw_dist = fast_nb_cosine_dist_condense(bucket_hv, bucket_prec_mz, precursor_tol[0], output_type)
+
+#         lk = fastcluster.linkage(pw_dist, linkage)
+
+#         L = fcluster(lk, eps, 'distance') - 1
+
+#         cluster_labels_refined = refine_cluster(
+#             bucket_cluster_label = L, 
+#             bucket_precursor_mzs = bucket_prec_mz,
+#             bucket_rts = bucket_rt_time,
+#             precursor_tol_mass = precursor_tol[0], 
+#             precursor_tol_mode = precursor_tol[1], 
+#             rt_tol = rt_tol)
+                
+#         pw_dist = squareform(pw_dist).astype(np.float32)
+#         representative_mask = get_cluster_representative(
+#             cluster_labels=cluster_labels_refined, pw_dist=pw_dist)
+        
+#         return [cluster_labels_refined, representative_mask]
     
 
 
