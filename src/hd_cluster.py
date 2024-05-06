@@ -617,7 +617,7 @@ def hcluster_bucket(
     output_type: str='numpy'
 ):
     if bucket_slice[1]-bucket_slice[0]==0:
-        return [np.array([-1]), np.array([True], dtype=np.bool)]
+        return [np.array([-1]), np.array([True], dtype=bool)]
     else:
         bucket_slice[1] += 1
         bucket_hv = data_dict['hv'][bucket_slice[0]: bucket_slice[1]]
@@ -658,10 +658,12 @@ def hcluster_bucket(
 def kmeans_and_hierarchical(
     bucket_hv: np.ndarray,
     bucket_prec_mz: np.ndarray,
+    bucket_rt_time: np.ndarray,
     precursor_tol: list,
     k: int,
     linkage: str,
     eps: float,
+    rt_tol: float,
     output_type: str
 ):
     """
@@ -670,20 +672,20 @@ def kmeans_and_hierarchical(
     Parameters:
     - bucket_hv: The hypervectors for the current bucket.
     - bucket_prec_mz: The precursor m/z values for the current bucket.
+    - bucket_rt_time: Retention times.
     - precursor_tol: Tolerance for precursor m/z value.
     - k: The number of K-means clusters.
     - linkage: The linkage criterion for hierarchical clustering.
     - eps: The maximum distance for flat clustering.
+    - rt_tol: Tolerance for retention time.
     - output_type: Output format for distance matrix ('numpy' or 'cupy').
 
     Returns:
-    - cluster_labels: Array of cluster labels for all elements in the bucket.
+    - cluster_labels: Array of refined cluster labels for all elements in the bucket.
     """
-    # Perform K-means clustering
     kmeans = KMeans(n_clusters=k, n_init='auto')
     kmeans_labels = kmeans.fit_predict(bucket_hv)
-    
-    # Initialize the array to store final cluster labels
+
     final_labels = np.zeros(bucket_hv.shape[0], dtype=int)
     max_label = 0
 
@@ -691,6 +693,7 @@ def kmeans_and_hierarchical(
         cluster_indices = np.where(kmeans_labels == label)[0]
         cluster_data = bucket_hv[cluster_indices]
         cluster_prec_mz = bucket_prec_mz[cluster_indices]
+        cluster_rt_time = bucket_rt_time[cluster_indices]
 
         # Skip clusters with less than two elements
         if cluster_data.shape[0] <= 1:
@@ -700,13 +703,24 @@ def kmeans_and_hierarchical(
         # Perform hierarchical clustering on the current K-means cluster
         pw_dist = fast_nb_cosine_dist_condense(cluster_data, cluster_prec_mz, precursor_tol[0], output_type)
         lk = fastcluster.linkage(pw_dist, linkage)
-        L = fcluster(lk, eps, 'distance')
+        L = fcluster(lk, eps, 'distance') - 1
 
         # Adjust labels to be unique across clusters
         final_labels[cluster_indices] = L + max_label
-        max_label += max(L)
+        max_label += max(L) + 1
+
+    # Refine the clusters across all partitions
+    refined_labels = refine_cluster(
+        bucket_cluster_label=final_labels,
+        bucket_precursor_mzs=bucket_prec_mz,
+        bucket_rts=bucket_rt_time,
+        precursor_tol_mass=precursor_tol[0],
+        precursor_tol_mode=precursor_tol[1],
+        rt_tol=rt_tol
+    )
     
-    return final_labels
+    return refined_labels
+
 
 def hcluster_par_bucket(
     bucket_slice: tuple, 
@@ -723,11 +737,11 @@ def hcluster_par_bucket(
     k = max(1, math.ceil(bucket_size / 300))
     
     if bucket_size <= 0:
-        return [np.array([-1]), np.array([True], dtype=np.bool)]
+        return [np.array([-1]), np.array([True], dtype=bool)]
     else:
         # Perform K-means and hierarchical clustering
         cluster_labels_refined = kmeans_and_hierarchical(
-            bucket_hv, bucket_prec_mz, precursor_tol, k, linkage, eps, output_type)
+            bucket_hv, bucket_prec_mz, bucket_rt_time, precursor_tol, k, linkage, eps, rt_tol, output_type)
 
         pw_dist = fast_nb_cosine_dist_condense(bucket_hv, bucket_prec_mz, precursor_tol[0], output_type)
         pw_dist = squareform(pw_dist).astype(np.float32)
@@ -735,8 +749,6 @@ def hcluster_par_bucket(
             cluster_labels=cluster_labels_refined, pw_dist=pw_dist)
         
         return [cluster_labels_refined, representative_mask]
-
-
 
 
 
