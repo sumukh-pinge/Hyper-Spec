@@ -683,7 +683,7 @@ def kmeans_and_hierarchical(
     Returns:
     - cluster_labels: Array of refined cluster labels for all elements in the bucket.
     """
-    kmeans = KMeans(n_clusters=k, n_init='auto')
+    kmeans = KMeans(n_clusters=k, n_init=5)
     kmeans_labels = kmeans.fit_predict(bucket_hv)
 
     final_labels = np.zeros(bucket_hv.shape[0], dtype=int)
