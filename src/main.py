@@ -61,7 +61,7 @@ def main(args: Union[str, List[str]] = None) -> int:
     logger.debug('cluster_alg = %s', config.cluster_alg)
     logger.debug('fragment_tol = %.2f', config.fragment_tol)
     logger.debug('eps = %.3f', config.eps)
-
+    logger.debug('cluster_width = %f', config.cluster_width)
     
     # Restore checkpoints
     spectra_meta_df, spectra_hvs = None, None
