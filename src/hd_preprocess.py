@@ -157,30 +157,11 @@ def sort_spectra_meta_data(
 
 
 @nb.njit(fastmath=True, cache=True)
-def _precursor_to_interval(
-    mz: float,
-    charge: int,
-    interval_width: int
-    ) -> int:
-    """
-    Convert the precursor m/z to the neutral mass and get the interval index.
-    Parameters
-    ----------
-    mz : float
-        The precursor m/z.
-    charge : int
-        The precursor charge.
-    interval_width : int
-        The width of each m/z interval.
-    Returns
-    -------
-    int
-        The index of the interval to which a spectrum with the given m/z and
-        charge belongs.
-    """
-    hydrogen_mass, cluster_width = 1.00794, 1.0005079
+def _precursor_to_interval(mz: float, charge: int, interval_width: int, cluster_width: float) -> int:
+    hydrogen_mass = 1.00794
     neutral_mass = (mz - hydrogen_mass) * max(abs(charge), 1)
     return round(neutral_mass / cluster_width) // interval_width
+
 
 
 @nb.njit(cache=True)
@@ -428,7 +409,8 @@ def preprocess_read_spectra_list(
         remove_precursor_tolerance: Optional[float] = 1.50,
         min_intensity: Optional[float] = 0.01,
         max_peaks_used: Optional[int] = 50,
-        scaling: Optional[str] = 'off'
+        scaling: Optional[str] = 'off',
+        cluster_width: float = 1.0005079
     ):
     """
     Process a cluster.
@@ -504,7 +486,7 @@ def preprocess_read_spectra_list(
 
         # Add bucket
         interval_i = _precursor_to_interval(
-            mz=spectra_list[i][2], charge=spectra_list[i][1], interval_width=mz_interval)
+            mz=spectra_list[i][2], charge=spectra_list[i][1], interval_width=mz_interval, cluster_width=cluster_width)
         spectra_list[i][0] = interval_i
 
         # Pad precursor mz and intensity to size-max_peaks_used
@@ -537,7 +519,8 @@ def load_process_single(
     remove_precursor_tolerance: Optional[float] = 1.50,
     min_intensity: Optional[float] = 0.01,
     max_peaks_used: Optional[int] = 50,
-    scaling: Optional[str] = 'off'
+    scaling: Optional[str] = 'off',
+    cluster_width: float = 1.0005079
 ):
     spec_list = fast_mgf_parse(file)
     
@@ -550,7 +533,8 @@ def load_process_single(
             remove_precursor_tolerance = remove_precursor_tolerance,
             min_intensity = min_intensity,
             max_peaks_used = max_peaks_used,
-            scaling = scaling)
+            scaling = scaling,
+            cluster_width=cluster_width)
 
     return spec_list
 
@@ -576,7 +560,8 @@ def load_process_spectra_parallel(
                 remove_precursor_tolerance = config.remove_precursor_tol,
                 min_intensity = config.min_intensity,
                 max_peaks_used = config.max_peaks_used,
-                scaling = config.scaling) \
+                scaling = config.scaling,
+                cluster_width=config.cluster_width ) \
                 for f_i in tqdm.tqdm(input_files))
 
     spectra_mz = np.array([j[6] for i in read_spectra_list for j in i], dtype=np.float32)
