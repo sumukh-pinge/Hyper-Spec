@@ -734,7 +734,7 @@ def hcluster_par_bucket(
     output_type: str='numpy'
 ):
     bucket_size = bucket_slice[1] - bucket_slice[0] + 1
-    k = max(1, math.ceil(bucket_size / 300))
+    k = max(1, math.ceil(bucket_size / 1000))
     
     if bucket_size <= 0:
         return [np.array([-1]), np.array([True], dtype=bool)]
