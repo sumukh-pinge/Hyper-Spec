@@ -695,9 +695,9 @@ def kmeans_and_hierarchical(
         cluster_prec_mz = bucket_prec_mz[cluster_indices]
         cluster_rt_time = bucket_rt_time[cluster_indices]
 
-        # Skip clusters with less than two elements
         if cluster_data.shape[0] <= 1:
-            final_labels[cluster_indices] = -1
+            final_labels[cluster_indices] = max_label
+            max_label += 1
             continue
 
         # Perform hierarchical clustering on the current K-means cluster
@@ -749,7 +749,6 @@ def hcluster_par_bucket(
             cluster_labels=cluster_labels_refined, pw_dist=pw_dist)
         
         return [cluster_labels_refined, representative_mask]
-
 
 
 
