@@ -119,6 +119,10 @@ class Config:
             choices=['off', 'root', 'log', 'rank'],
             help='Peak scaling method used to reduce the influence of very '
                  'intense peaks (default: %(default)s).')
+        self._parser.add_argument(
+            '--cluster_width', type=float, default=1.0005079,
+            help='Width of the clustering interval (default: %(default)s).')
+
 
         # CLUSTERING
         self._parser.add_argument(
