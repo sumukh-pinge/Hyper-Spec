@@ -61,6 +61,7 @@ def main(args: Union[str, List[str]] = None) -> int:
     logger.debug('cluster_alg = %s', config.cluster_alg)
     logger.debug('fragment_tol = %.2f', config.fragment_tol)
     logger.debug('eps = %.3f', config.eps)
+    logger.debug('ber_encoded = %f', config.ber_encoded)
 
     
     # Restore checkpoints
