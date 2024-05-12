@@ -1,5 +1,6 @@
 import os, time, logging, math
 from tqdm import tqdm
+import math
 
 import numpy as np
 np.random.seed(0)
@@ -19,6 +20,7 @@ from scipy.spatial.distance import squareform
 from scipy.cluster.hierarchy import fcluster
 import fastcluster
 from sklearn.cluster import DBSCAN
+from sklearn.cluster import KMeans
 
 from config import Config
 from joblib import Parallel, delayed
@@ -291,13 +293,28 @@ def fast_pw_dist_cosine_mask_packed_condense(A, D, prec_mz, prec_tol, N, pack_le
             D[int(N*x-(x*x+x)/2+y-x-1)] = tmp
            
 
-def fast_nb_cosine_dist_condense(hvs, prec_mz, prec_tol, output_type, stream=None):
+def apply_ber_to_packed_hvs(hvs, ber=0.05):
+    total_bits = hvs.size * 32
+    bits_to_flip = int(total_bits * ber)
+    indices_to_flip = cp.random.choice(total_bits, bits_to_flip, replace=False)  # Use CuPy to generate indices
+
+    array_indices = indices_to_flip // 32
+    bit_positions = indices_to_flip % 32
+
+    hvs = hvs.ravel()
+    hvs[array_indices] ^= cp.asarray(1 << bit_positions, dtype=hvs.dtype)  # Ensure bitwise operation in CuPy
+
+
+
+def fast_nb_cosine_dist_condense(hvs, prec_mz, prec_tol, output_type, ber_encoded, stream=None):
     N, pack_len = hvs.shape
     
     hvs_d = cp.array(hvs)
     prec_mz_d = cp.array(prec_mz.ravel())
     prec_tol_d = nb.float32(prec_tol/1e6)
     dist_d = cp.zeros(int(N*(N-1)/2), dtype=cp.float32)
+
+    apply_ber_to_packed_hvs(hvs_d, ber_encoded)
 
     TPB = 32
     threadsperblock = (TPB, TPB)
@@ -662,12 +679,13 @@ def hcluster_par_bucket(
     precursor_tol: list,
     eps: float,
     rt_tol: float,
+    ber_encoded: float,
     output_type: str='numpy'
 ):
     if bucket_slice[1]-bucket_slice[0]==0:
         return [np.array([-1]), np.array([True], dtype=np.bool)]
     else:
-        pw_dist = fast_nb_cosine_dist_condense(bucket_hv, bucket_prec_mz, precursor_tol[0], output_type)
+        pw_dist = fast_nb_cosine_dist_condense(bucket_hv, bucket_prec_mz, precursor_tol[0], output_type, ber_encoded)
 
         lk = fastcluster.linkage(pw_dist, linkage)
 
@@ -734,7 +752,7 @@ def cluster_spectra(
                 data_dict['hv'][b_slice_i[0]: b_slice_i[1]+1],
                 data_dict['prec_mz'][b_slice_i[0]: b_slice_i[1]+1],
                 data_dict['rt_time'][b_slice_i[0]: b_slice_i[1]+1],
-                config.cluster_alg[3:], config.precursor_tol, config.eps, config.rt_tol, 'numpy')
+                config.cluster_alg[3:], config.precursor_tol, config.eps, config.rt_tol,config.ber_encoded,'numpy')
                     for b_slice_i in tqdm(bucket_idx_dict['sort_bucket_idx_arr']))
                    
         # cluster_results = [hcluster_bucket(
