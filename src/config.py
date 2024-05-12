@@ -156,6 +156,10 @@ class Config:
             help='The eps parameter (Hamming distance) for DBSCAN clustering '
                  '(default: %(default)s). Relevant Hamming distance thresholds '
                  'are typically around 0.6.')
+        
+        self._parser.add_argument(
+            '--ber_encoded', type=float, default=0.00,
+            help='BER rate of Encoded HVs (default: %(default)s).')
 
         # Filled in 'parse', contains the specified settings.
         self._namespace = None
