@@ -294,15 +294,18 @@ def fast_pw_dist_cosine_mask_packed_condense(A, D, prec_mz, prec_tol, N, pack_le
            
 
 def apply_ber_to_packed_hvs(hvs, ber=0.05):
-    total_bits = hvs.size * 32
-    bits_to_flip = int(total_bits * ber)
-    indices_to_flip = cp.random.choice(total_bits, bits_to_flip, replace=False)  # Use CuPy to generate indices
+    
+    total_bits = hvs.size * hvs.dtype.itemsize * 8
+    num_bits_to_flip = int(total_bits * ber)
 
-    array_indices = indices_to_flip // 32
-    bit_positions = indices_to_flip % 32
+    mask_flat = cp.random.choice([0, 1], size=total_bits, p=[1 - ber, ber])
+    mask_flat = mask_flat.astype(hvs.dtype)
 
-    hvs = hvs.ravel()
-    hvs[array_indices] ^= cp.asarray(1 << bit_positions, dtype=hvs.dtype)  # Ensure bitwise operation in CuPy
+    mask = cp.packbits(mask_flat.reshape(-1, 8)[:, ::-1].ravel()).view(hvs.dtype)
+    mask = mask.reshape(hvs.shape)
+    hvs ^= mask
+
+    return hvs
 
 
 
